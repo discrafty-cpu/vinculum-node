@@ -27,17 +27,18 @@ jobs:
 
       - name: Sync shared assets to Hub
         run: |
-          # Create shared directory in Hub if it doesn't exist
-          mkdir -p hub/shared/engines hub/shared/data hub/shared/css
+          # Hub tools reference ../../shared/vinculum-math.js (flat structure)
+          # So engines and CSS go directly into shared/ root, data gets a subdirectory
+          mkdir -p hub/shared hub/shared/data
 
-          # Sync engines
-          cp -R node/engines/* hub/shared/engines/
+          # Sync engines (flat — Hub tools use ../../shared/vinculum-math.js)
+          cp node/engines/*.js hub/shared/
 
-          # Sync data
+          # Sync CSS (flat — Hub tools use ../../shared/vinculum-tiles.css)
+          cp node/css/*.css hub/shared/
+
+          # Sync data (organized in subdirectories)
           cp -R node/data/* hub/shared/data/
-
-          # Sync CSS
-          cp -R node/css/* hub/shared/css/
 
           # Sync tool catalog
           cp node/vinculum-tools-api.json hub/shared/
@@ -53,9 +54,9 @@ jobs:
             Automated sync from [vinculum-node](https://github.com/discrafty-cpu/vinculum-node).
 
             **Changed files synced:**
-            - `shared/engines/` — JS engines
+            - `shared/*.js` — JS engines (flat, matching tool import paths)
+            - `shared/*.css` — Shared stylesheets (flat, matching tool import paths)
             - `shared/data/` — Curriculum data files
-            - `shared/css/` — Shared stylesheets
             - `shared/vinculum-tools-api.json` — Tool catalog
 
             Review and merge when ready. This will not affect Hub until merged.
@@ -79,7 +80,7 @@ jobs:
 
       - name: Sync shared assets to Digester
         run: |
-          # Create shared directory in Digester if it doesn't exist
+          # Digester uses organized structure: shared/engines/, shared/data/, shared/css/
           mkdir -p digester/shared/engines digester/shared/data digester/shared/css
 
           # Sync engines
