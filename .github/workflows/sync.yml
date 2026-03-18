@@ -1,6 +1,7 @@
 name: Sync NODE to Hub and Digester
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:

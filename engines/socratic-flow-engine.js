@@ -820,6 +820,53 @@ const SocraticFlowEngine = (() => {
             if (weighted >= 0.6) return 'developing';
             return 'emerging';
         }
+
+        // ── Persistence ──
+
+        /**
+         * Serialize session state to a plain JSON-safe object.
+         * Excludes callbacks and computed fields.
+         */
+        serialize() {
+            return {
+                _v: 1,
+                flowTopic: this.flow.topic,
+                flowId: this.flow.id,
+                grade: this.grade,
+                comfort: this.comfort,
+                currentNodeId: this.currentNodeId,
+                history: this.history.map(h => ({ ...h })),
+                hintsUsed: { ...this.hintsUsed },
+                score: { ...this.score },
+                startTime: this.startTime,
+                phase: this.phase,
+                timestamp: Date.now()
+            };
+        }
+
+        /**
+         * Restore session state from a serialized object.
+         * Returns true if restore succeeded, false if state was invalid.
+         */
+        restore(saved) {
+            if (!saved || saved._v !== 1) return false;
+            if (saved.flowTopic !== this.flow.topic) return false;
+
+            this.currentNodeId = saved.currentNodeId;
+            this.history = (saved.history || []).map(h => ({ ...h }));
+            this.hintsUsed = { ...saved.hintsUsed };
+            this.score = { ...saved.score };
+            this.startTime = saved.startTime || Date.now();
+            this.phase = saved.phase || 'orient';
+
+            // Verify the current node still exists in this flow
+            if (this.currentNodeId && !this.nodeIndex[this.currentNodeId]) {
+                this.currentNodeId = this.flow.startNode;
+                return false;
+            }
+
+            return true;
+        }
     }
 
     // ════════════════════════════════════════════════
@@ -864,6 +911,158 @@ const SocraticFlowEngine = (() => {
     }
 
     // ════════════════════════════════════════════════
+    //  PERSISTENCE — localStorage save/load/list
+    // ════════════════════════════════════════════════
+
+    const STORAGE_PREFIX = 'vinculum_sf_';
+    const COMPLETED_PREFIX = 'vinculum_sf_done_';
+
+    const persistence = {
+        /**
+         * Save a session's state to localStorage.
+         * @param {FlowSession} session
+         */
+        save(session) {
+            if (typeof localStorage === 'undefined') return false;
+            try {
+                const key = STORAGE_PREFIX + session.flow.topic;
+                const data = session.serialize();
+                localStorage.setItem(key, JSON.stringify(data));
+                return true;
+            } catch (e) { return false; }
+        },
+
+        /**
+         * Load saved state for a topic. Returns parsed object or null.
+         */
+        load(topic) {
+            if (typeof localStorage === 'undefined') return null;
+            try {
+                const raw = localStorage.getItem(STORAGE_PREFIX + topic);
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (e) { return null; }
+        },
+
+        /**
+         * Check if a saved session exists for a topic.
+         */
+        has(topic) {
+            if (typeof localStorage === 'undefined') return false;
+            return localStorage.getItem(STORAGE_PREFIX + topic) !== null;
+        },
+
+        /**
+         * Remove saved session for a topic.
+         */
+        clear(topic) {
+            if (typeof localStorage === 'undefined') return;
+            localStorage.removeItem(STORAGE_PREFIX + topic);
+        },
+
+        /**
+         * Remove all saved sessions.
+         */
+        clearAll() {
+            if (typeof localStorage === 'undefined') return;
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key);
+            }
+            keys.forEach(k => localStorage.removeItem(k));
+        },
+
+        /**
+         * List all saved in-progress sessions.
+         * Returns array of { topic, grade, score, progress, timestamp, mastery }.
+         */
+        listSaved() {
+            if (typeof localStorage === 'undefined') return [];
+            const results = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key || !key.startsWith(STORAGE_PREFIX) || key.startsWith(COMPLETED_PREFIX)) continue;
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    if (!data || !data.flowTopic) continue;
+                    const total = (data.score.correct || 0) + (data.score.incorrect || 0) +
+                                  (data.score.partial || 0) + (data.score.skipped || 0);
+                    results.push({
+                        topic: data.flowTopic,
+                        grade: data.grade,
+                        score: data.score,
+                        progress: { answered: data.history ? data.history.length : 0 },
+                        timestamp: data.timestamp,
+                        mastery: total === 0 ? 'not-assessed' :
+                            ((data.score.correct + data.score.partial * 0.5) / total >= 0.85 ? 'mastered' :
+                             (data.score.correct + data.score.partial * 0.5) / total >= 0.6 ? 'developing' : 'emerging')
+                    });
+                } catch (e) { /* skip corrupt entries */ }
+            }
+            return results.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        },
+
+        /**
+         * Record a completed session summary.
+         */
+        recordCompletion(session) {
+            if (typeof localStorage === 'undefined') return false;
+            try {
+                const key = COMPLETED_PREFIX + session.flow.topic;
+                const summary = session._buildSummary();
+                const existing = this._getCompletions(session.flow.topic);
+                existing.push({
+                    timestamp: Date.now(),
+                    score: summary.score,
+                    mastery: summary.mastery,
+                    elapsed: summary.elapsed,
+                    grade: summary.grade,
+                    comfort: summary.comfort
+                });
+                // Keep last 10 completions per topic
+                if (existing.length > 10) existing.splice(0, existing.length - 10);
+                localStorage.setItem(key, JSON.stringify(existing));
+                // Remove in-progress save
+                this.clear(session.flow.topic);
+                return true;
+            } catch (e) { return false; }
+        },
+
+        /**
+         * Get completion history for a topic.
+         */
+        getCompletions(topic) {
+            return this._getCompletions(topic);
+        },
+
+        /**
+         * Get all completion records across all topics.
+         */
+        getAllCompletions() {
+            if (typeof localStorage === 'undefined') return {};
+            const results = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key || !key.startsWith(COMPLETED_PREFIX)) continue;
+                try {
+                    const topic = key.slice(COMPLETED_PREFIX.length);
+                    results[topic] = JSON.parse(localStorage.getItem(key));
+                } catch (e) { /* skip */ }
+            }
+            return results;
+        },
+
+        _getCompletions(topic) {
+            if (typeof localStorage === 'undefined') return [];
+            try {
+                const raw = localStorage.getItem(COMPLETED_PREFIX + topic);
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) { return []; }
+        }
+    };
+
+    // ════════════════════════════════════════════════
     //  PUBLIC API
     // ════════════════════════════════════════════════
 
@@ -881,8 +1080,44 @@ const SocraticFlowEngine = (() => {
          * @returns {FlowSession}
          */
         start(topicOrId, options) {
-            const flowDef = resolveFlowWithCustom(topicOrId, options);
-            return new FlowSession(flowDef, options);
+            const opts = options || {};
+            const flowDef = resolveFlowWithCustom(topicOrId, opts);
+            const session = new FlowSession(flowDef, opts);
+
+            // Auto-inject vocab node at flow start if MCAVocabEngine is available
+            if (opts.vocab === true && typeof MCAVocabEngine !== 'undefined') {
+                const vocabNode = MCAVocabEngine.generateVocabNode(flowDef.topic, '_vocab_intro');
+                if (vocabNode) {
+                    vocabNode.next = flowDef.startNode;
+                    session.nodeIndex[vocabNode.id] = vocabNode;
+                    session.flow.nodes.push(vocabNode);
+                    session.flow.startNode = vocabNode.id;
+                    session.currentNodeId = vocabNode.id;
+                }
+            }
+
+            return session;
+        },
+
+        /**
+         * Resume a saved session for a topic.
+         * Returns a FlowSession with restored state, or null if no save exists.
+         * @param {string} topic - Topic slug
+         * @param {Object} options - { grade, comfort, theme }
+         * @returns {FlowSession|null}
+         */
+        resume(topic, options) {
+            const saved = persistence.load(topic);
+            if (!saved) return null;
+
+            const flowDef = resolveFlowWithCustom(topic, options);
+            const session = new FlowSession(flowDef, options);
+            const ok = session.restore(saved);
+            if (!ok) {
+                persistence.clear(topic);
+                return null;
+            }
+            return session;
         },
 
         /**
@@ -929,6 +1164,11 @@ const SocraticFlowEngine = (() => {
          */
         getSocraticStems(type) {
             return [...(SOCRATIC_STEMS[type] || SOCRATIC_STEMS.probe)];
-        }
+        },
+
+        /**
+         * Persistence API — save/load/list student progress.
+         */
+        persistence
     };
 })();

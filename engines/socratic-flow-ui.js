@@ -306,9 +306,26 @@ const SocraticFlowUI = (() => {
             this._renderCurrentNode();
 
             // Wire session events
-            this.session.onNodeChange(() => this._renderCurrentNode());
-            this.session.onComplete((summary) => this._renderSummary(summary));
-            this.session.onScoreChange(() => this._updateScore());
+            this.session.onNodeChange(() => {
+                this._renderCurrentNode();
+                this._autoSave();
+            });
+            this.session.onComplete((summary) => {
+                this._renderSummary(summary);
+                SocraticFlowEngine.persistence.recordCompletion(this.session);
+            });
+            this.session.onScoreChange(() => {
+                this._updateScore();
+                this._autoSave();
+            });
+        }
+
+        /**
+         * Auto-save current session state to localStorage.
+         */
+        _autoSave() {
+            if (this._destroyed || this.session.isComplete()) return;
+            SocraticFlowEngine.persistence.save(this.session);
         }
 
         // ── Build DOM structure ──
@@ -843,15 +860,27 @@ const SocraticFlowUI = (() => {
         }
 
         _restart() {
+            // Clear saved state for this topic
+            SocraticFlowEngine.persistence.clear(this.session.flow.topic);
+
             // Create a new session with the same options
             const newSession = SocraticFlowEngine.start(
                 this.session.flow.topic || this.session.flow.id,
                 this.options
             );
             this.session = newSession;
-            this.session.onNodeChange(() => this._renderCurrentNode());
-            this.session.onComplete((summary) => this._renderSummary(summary));
-            this.session.onScoreChange(() => this._updateScore());
+            this.session.onNodeChange(() => {
+                this._renderCurrentNode();
+                this._autoSave();
+            });
+            this.session.onComplete((summary) => {
+                this._renderSummary(summary);
+                SocraticFlowEngine.persistence.recordCompletion(this.session);
+            });
+            this.session.onScoreChange(() => {
+                this._updateScore();
+                this._autoSave();
+            });
 
             // Reset UI
             this._updateScore();
@@ -860,6 +889,10 @@ const SocraticFlowUI = (() => {
 
         // ── Close / destroy ──
         close() {
+            // Save progress before closing if session is still in progress
+            if (!this.session.isComplete()) {
+                SocraticFlowEngine.persistence.save(this.session);
+            }
             this._destroyed = true;
             if (this.mode === 'overlay') {
                 this.el.classList.remove('sf-visible');
@@ -1022,16 +1055,26 @@ const SocraticFlowUI = (() => {
          */
         embed(container, options) {
             const opts = { ...options, mode: 'inline', container };
-            const session = SocraticFlowEngine.start(opts.topic || 'math', {
+            const sessionOpts = {
                 grade: opts.grade,
                 comfort: opts.comfort || 2,
-                theme: resolveTheme(opts)
-            });
+                theme: resolveTheme(opts),
+                vocab: opts.vocab !== false // opt-in by default in UI
+            };
+            const topic = opts.topic || 'math';
+            let session = null;
+            if (!opts.forceNew && SocraticFlowEngine.persistence.has(topic)) {
+                session = SocraticFlowEngine.resume(topic, sessionOpts);
+            }
+            if (!session) {
+                session = SocraticFlowEngine.start(topic, sessionOpts);
+            }
             return new FlowPanel(session, opts);
         },
 
         /**
          * Open the Socratic flow in an overlay (programmatic).
+         * Automatically checks for saved progress and resumes if available.
          */
         open(options) {
             const opts = options || {};
@@ -1040,11 +1083,22 @@ const SocraticFlowUI = (() => {
                 return;
             }
             const theme = resolveTheme(opts);
-            const session = SocraticFlowEngine.start(opts.topic, {
+            const sessionOpts = {
                 grade: opts.grade,
                 comfort: opts.comfort || 2,
-                theme: theme
-            });
+                theme: theme,
+                vocab: opts.vocab !== false // opt-in by default in UI
+            };
+
+            // Try to resume from saved state
+            let session = null;
+            if (!opts.forceNew && SocraticFlowEngine.persistence.has(opts.topic)) {
+                session = SocraticFlowEngine.resume(opts.topic, sessionOpts);
+            }
+            if (!session) {
+                session = SocraticFlowEngine.start(opts.topic, sessionOpts);
+            }
+
             return new FlowPanel(session, { mode: 'overlay', theme: theme, ...opts });
         },
 
