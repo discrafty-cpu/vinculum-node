@@ -36,10 +36,11 @@ This repository is the **single source of truth** for all shared engines, data f
 
 ```
 vinculum-node/
-├── engines/                    # 25 JavaScript engines (~19,500+ LOC)
-│   ├── socratic-flow-engine.js     # Adaptive branching dialogue state machine
-│   ├── socratic-flow-ui.js         # Theme-aware overlay/inline panel renderer
-│   ├── socratic-flows-data.js      # 16 curated Socratic flow definitions
+├── engines/                    # 26 JavaScript engines (~22,000+ LOC)
+│   ├── socratic-flow-engine.js     # Adaptive branching dialogue state machine + persistence
+│   ├── socratic-flow-ui.js         # Theme-aware overlay/inline panel renderer + auto-save
+│   ├── socratic-flows-data.js      # 28 curated Socratic flow definitions (Gr5-Algebra+)
+│   ├── mca-vocab-engine.js         # 365+ math vocabulary terms + flow integration
 │   ├── math-visual-engine.js       # 14 SVG visual types for K-8
 │   ├── math-models.js              # SVG math model generator library
 │   ├── pptx-themes.js              # 10 themes (colors, fonts, dark/light)
@@ -81,7 +82,7 @@ vinculum-node/
 ├── vinculum-tools-api.json     # Tool catalog: 234 tools with full metadata
 │                                  (CCSS, MN, TEKS, CRA, Piaget, misconceptions)
 │
-├── docs/                       # 16 design & reference documents
+├── docs/                       # 17 design & reference documents
 │   ├── DEVELOPER-BRIEF.md         # Full ecosystem handoff document
 │   ├── CRA-PIAGET-FRAMEWORK-DESIGN.md
 │   ├── VINCULUM-Master-Tool-Plan.md
@@ -90,6 +91,7 @@ vinculum-node/
 │   ├── MathVisualEngine_Research_Report.md
 │   ├── STANDARDS-REFERENCE.md
 │   ├── INDIGENOUS_INTEGRATION_GUIDE.md
+│   ├── ETHNOMATHEMATICS-RESEARCH-REPORT.md
 │   ├── AUDIT_COMPREHENSIVE_2025.md
 │   ├── AUDIT_INDEX.md
 │   ├── VINCULUM-Feasibility-Report.md
