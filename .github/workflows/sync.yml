@@ -81,19 +81,21 @@ jobs:
 
       - name: Sync shared assets to Digester
         run: |
-          # Digester uses organized structure: shared/engines/, shared/data/, shared/css/
-          mkdir -p digester/shared/engines digester/shared/data digester/shared/css
+          # Digester HTML references js/filename.js and uses webapp/ as root
+          # Engines → webapp/js/, CSS → webapp/css/, data → shared/data/
+          mkdir -p digester/webapp/js digester/webapp/css digester/shared/data
 
-          # Sync engines
-          cp -R node/engines/* digester/shared/engines/
+          # Sync engines to webapp/js/ (where HTML script tags point)
+          cp node/engines/*.js digester/webapp/js/
 
-          # Sync data
+          # Sync CSS to webapp/css/
+          cp node/css/*.css digester/webapp/css/
+
+          # Sync data (organized in subdirectories)
           cp -R node/data/* digester/shared/data/
 
-          # Sync CSS
-          cp -R node/css/* digester/shared/css/
-
           # Sync tool catalog
+          mkdir -p digester/shared
           cp node/vinculum-tools-api.json digester/shared/
 
       - name: Create PR to Digester
@@ -107,9 +109,9 @@ jobs:
             Automated sync from [vinculum-node](https://github.com/discrafty-cpu/vinculum-node).
 
             **Changed files synced:**
-            - `shared/engines/` — JS engines
+            - `webapp/js/` — JS engines (matching HTML script paths)
+            - `webapp/css/` — Shared stylesheets
             - `shared/data/` — Curriculum data files
-            - `shared/css/` — Shared stylesheets
             - `shared/vinculum-tools-api.json` — Tool catalog
 
             Review and merge when ready. This will not affect Digester until merged.
