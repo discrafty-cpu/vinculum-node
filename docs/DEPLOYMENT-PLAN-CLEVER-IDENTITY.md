@@ -173,10 +173,42 @@ Some districts use ClassLink instead of Clever. The integration is similar (OAut
 
 ---
 
+## Clever Tiers — What You Get at Each Level
+
+| Tier | Cost | What you get | PII received |
+|---|---|---|---|
+| **Clever Library + SSO** | Free | App listed in 110K+ school portals, SSO login, teacher-initiated provisioning | Student: first name + last initial + Clever ID. No email. |
+| **Secure Sync** | $18/school/month (50-school min) | Full roster sync, demographics, class lists, daily auto-updates | Student: full name, grade, school, potentially email |
+| **LMS Connect** | Add-on pricing | Grade passback to Google Classroom / Canvas / Schoology | Same as Secure Sync |
+
+**First 5 schools are free** on Secure Sync — enough to pilot.
+
+**Recommendation:** Start with Clever Library + SSO (free). It gets you distribution and SSO without storing meaningful PII. Move to Secure Sync only when districts request teacher dashboards with full roster data.
+
+---
+
+## Compliance (Already Handled by Clever)
+
+- FERPA certified (iKeepSafe)
+- COPPA Safe Harbor certified (iKeepSafe)
+- Student Privacy Pledge signatory
+- SOPIPA (CA), SOPPA (IL) compliant
+- SDPC National Data Privacy Agreement participant
+- Clever does NOT sell student data or show ads
+
+**What you must do as a partner:**
+- Sign Clever's Terms of Use + Data Sharing Agreement
+- Maintain HTTPS (you already have this via GitHub Pages)
+- Don't sell or share student data (you won't — you don't even store it)
+- Complete Clever Academy training (free online course)
+
+---
+
 ## Cost Summary
 | Item | Cost |
 |---|---|
 | Clever Developer account | Free |
-| Clever Library listing | Free (Clever charges schools, not developers) |
+| Clever Library + SSO listing | Free |
+| Secure Sync (when needed) | $18/school/month (first 5 free) |
 | Backend hosting (when needed) | ~$5-20/month (Render, Railway, or Fly.io) |
 | Database (when needed) | Free tier (Supabase, PlanetScale, or Turso) |
